@@ -1,115 +1,225 @@
-// Import Express framework
-const express = require('express');
+const express = require("express");
+const mongoose = require("mongoose");
+require("dotenv").config();
 
-// Initialize the Express application
+const Task = require("./models/Task");
+
 const app = express();
+const PORT = process.env.PORT || 5000;
+const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/task-manager-api";
 
-// Set the port to 5000
-const PORT = 5000;
-
-// Enable JSON body parsing middleware (express.json())
+// Middleware
 app.use(express.json());
 
-// In-memory data store for tasks
-let tasks = [];
-let nextId = 1; // Counter to generate unique sequential IDs
-
-// 1. Global Logging Middleware
-// Logs the HTTP method, request URL, and current timestamp
+// Logging Middleware
 app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
-  console.log(`${req.method} ${req.url} - ${timestamp}`);
-  next();
+    console.log(`${req.method} ${req.url} - ${new Date().toISOString()}`);
+    next();
 });
 
-// --- CRUD API Routes ---
-
-// GET /tasks - Return all tasks
-app.get('/tasks', (req, res) => {
-  res.status(200).json(tasks);
+// MongoDB Connection
+mongoose.connect(MONGO_URI)
+.then(() => {
+    console.log("✅ MongoDB Connected");
+})
+.catch((err) => {
+    console.log("MongoDB Connection Error:", err.message);
 });
 
-// POST /tasks - Create a task
-app.post('/tasks', (req, res, next) => {
-  try {
-    const { title } = req.body;
-    
-    // Create task object with unique sequential ID
-    const newTask = {
-      id: nextId++,
-      title: title || ""
-    };
-    
-    // Push the task to the in-memory array
-    tasks.push(newTask);
-    
-    // Return created task with 201 status code
-    res.status(201).json(newTask);
-  } catch (error) {
-    // Pass the error to the global error-handling middleware
-    next(error);
-  }
-});
 
-// PUT /tasks/:id - Update task title
-app.put('/tasks/:id', (req, res, next) => {
-  try {
-    const taskId = parseInt(req.params.id, 10);
-    const { title } = req.body;
-    
-    // Find the task inside the array
-    const task = tasks.find(t => t.id === taskId);
-    
-    // If the task does not exist, return 404 status code
-    if (!task) {
-      return res.status(404).json({ error: "Task not found" });
+// =========================
+// GET ALL TASKS
+// =========================
+app.get("/tasks", async (req, res, next) => {
+
+    try {
+
+        const tasks = await Task.find();
+
+        res.status(200).json(tasks);
+
+    } catch (err) {
+
+        next(err);
+
     }
-    
-    // Update the title
-    task.title = title || task.title;
-    
-    // Return the updated task with 200 status code
-    res.status(200).json(task);
-  } catch (error) {
-    // Pass the error to the global error-handling middleware
-    next(error);
-  }
+
 });
 
-// DELETE /tasks/:id - Delete task
-app.delete('/tasks/:id', (req, res, next) => {
-  try {
-    const taskId = parseInt(req.params.id, 10);
-    
-    // Find the index of the task in the array
-    const taskIndex = tasks.findIndex(t => t.id === taskId);
-    
-    // If the task does not exist, return 404 status code
-    if (taskIndex === -1) {
-      return res.status(404).json({ error: "Task not found" });
+
+// =========================
+// GET TASK BY ID
+// =========================
+app.get("/tasks/:id", async (req, res, next) => {
+
+    try {
+
+        const task = await Task.findById(req.params.id);
+
+        if (!task) {
+
+            return res.status(404).json({
+                success: false,
+                message: "Task not found"
+            });
+
+        }
+
+        res.status(200).json(task);
+
+    } catch (err) {
+
+        next(err);
+
     }
-    
-    // Remove the task from the array
-    tasks.splice(taskIndex, 1);
-    
-    // Return success message with 200 status code
-    res.status(200).json({ message: "Task deleted successfully" });
-  } catch (error) {
-    // Pass the error to the global error-handling middleware
-    next(error);
-  }
+
 });
 
-// 2. Global Error Handler Middleware
-// It MUST be the LAST app.use()
+
+// =========================
+// CREATE TASK
+// =========================
+app.post("/tasks", async (req, res, next) => {
+
+    try {
+
+        const task = await Task.create(req.body);
+
+        res.status(201).json(task);
+
+    } catch (err) {
+
+        next(err);
+
+    }
+
+});
+
+
+// =========================
+// UPDATE TASK
+// =========================
+app.put("/tasks/:id", async (req, res, next) => {
+
+    try {
+
+        const task = await Task.findByIdAndUpdate(
+
+            req.params.id,
+
+            req.body,
+
+            {
+                new: true,
+                runValidators: true
+            }
+
+        );
+
+        if (!task) {
+
+            return res.status(404).json({
+                success: false,
+                message: "Task not found"
+            });
+
+        }
+
+        res.status(200).json(task);
+
+    } catch (err) {
+
+        next(err);
+
+    }
+
+});
+
+
+// =========================
+// DELETE TASK
+// =========================
+app.delete("/tasks/:id", async (req, res, next) => {
+
+    try {
+
+        const task = await Task.findByIdAndDelete(req.params.id);
+
+        if (!task) {
+
+            return res.status(404).json({
+                success: false,
+                message: "Task not found"
+            });
+
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Task deleted successfully"
+        });
+
+    } catch (err) {
+
+        next(err);
+
+    }
+
+});
+
+
+// =========================
+// GLOBAL ERROR HANDLER
+// =========================
 app.use((err, req, res, next) => {
-  console.error("Error encountered:", err.message || err);
-  res.status(500).json({
-    error: "Something went wrong"
-  });
+
+    console.error(err);
+
+    if (err.name === "ValidationError") {
+
+        const errors = {};
+
+        Object.keys(err.errors).forEach(key => {
+
+            errors[key] = err.errors[key].message;
+
+        });
+
+        return res.status(400).json({
+
+            success: false,
+
+            errors
+
+        });
+
+    }
+
+    if (err.name === "CastError") {
+
+        return res.status(400).json({
+
+            success: false,
+
+            message: "Invalid Task ID"
+
+        });
+
+    }
+
+    res.status(500).json({
+
+        success: false,
+
+        message: err.message || "Internal Server Error"
+
+    });
+
 });
 
-// Start the server and listen on port 5000
+
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+
+    console.log(`Server running on http://localhost:${PORT}`);
+
 });

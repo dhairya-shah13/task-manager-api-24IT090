@@ -1,12 +1,15 @@
 {
   "name": "practical-task-api",
   "version": "1.0.0",
-  "description": "Simple Express CRUD API for college practical",
+  "description": "MongoDB CRUD API using Express and Mongoose",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "dotenv": "^17.2.1",
+    "express": "^4.22.2",
+    "mongoose": "^8.18.0"
   }
 }
