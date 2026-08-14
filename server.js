@@ -1,5 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const cors = require("cors");
 require("dotenv").config();
 
 const Task = require("./models/Task");
@@ -10,6 +11,9 @@ const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/task-manag
 
 // Middleware
 app.use(express.json());
+
+// Enable CORS so the React dev server (http://localhost:5173) can call this API
+app.use(cors());
 
 // Logging Middleware
 app.use((req, res, next) => {
