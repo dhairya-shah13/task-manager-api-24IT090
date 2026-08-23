@@ -44,9 +44,18 @@ const taskSchema = new mongoose.Schema({
 
         default: "medium"
 
+    },
+
+    // Owner of the task — used to keep each account's tasks private
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true
     }
 
 });
+
+taskSchema.index({ user: 1 });
 
 
 // Pre-save Hook
