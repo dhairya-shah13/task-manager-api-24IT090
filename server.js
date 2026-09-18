@@ -34,6 +34,12 @@ mongoose.connect(MONGO_URI)
 // Public auth routes: POST /register, POST /login, GET /me (protected inside the router)
 app.use(authRoutes);
 
+// Cache debug stats endpoint (Practical 9 supplementary)
+const cache = require("./cache");
+app.get("/debug/cache-stats", (req, res) => {
+    res.json(cache.getStats());
+});
+
 // Task pipeline: authMiddleware → validation (POST/PUT) → controller → MongoDB
 app.use("/tasks", authMiddleware, taskRoutes);
 
