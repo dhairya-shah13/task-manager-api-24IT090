@@ -1,0 +1,301 @@
+{
+	"info": {
+		"_postman_id": "9a0f3d41-2a6d-49b8-b715-e23e24it090p",
+		"name": "Task Manager API — Practical 4 to 9 (24IT090)",
+		"description": "Postman collection covering Authentication (JWT), Task CRUD, In-Memory Caching (node-cache), and Write Invalidation benchmarks.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "taskId",
+			"value": "6aacc93bb9fa9cddefd93b7b",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "01 - Authentication & JWT",
+			"item": [
+				{
+					"name": "1. POST Register New User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Dhairya Shah\",\n  \"email\": \"dhairya@example.com\",\n  \"password\": \"Password123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["register"]
+						}
+					}
+				},
+				{
+					"name": "2. POST Login (Obtain JWT)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.token) {",
+									"        pm.collectionVariables.set('token', jsonData.token);",
+									"        console.log('JWT Token saved to collection variable!');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"dhairya@example.com\",\n  \"password\": \"Password123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["login"]
+						}
+					}
+				},
+				{
+					"name": "3. GET Current User Profile (/me)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["me"]
+						}
+					}
+				},
+				{
+					"name": "4. GET Tasks Without Token (401 Unauthorized Test)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "02 - Practical 9 Caching Benchmarks",
+			"item": [
+				{
+					"name": "5. GET Initial Cache Stats (Empty / Fresh)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/debug/cache-stats",
+							"host": ["{{baseUrl}}"],
+							"path": ["debug", "cache-stats"]
+						}
+					}
+				},
+				{
+					"name": "6. GET All Tasks — Cache MISS (Direct MongoDB Fetch)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks"]
+						}
+					}
+				},
+				{
+					"name": "7. GET All Tasks — Cache HIT (In-Memory RAM Response)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks"]
+						}
+					}
+				},
+				{
+					"name": "8. GET Cache Stats (Verify Hit Count & Active Keys)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/debug/cache-stats",
+							"host": ["{{baseUrl}}"],
+							"path": ["debug", "cache-stats"]
+						}
+					}
+				},
+				{
+					"name": "9. GET Single Task by ID (/tasks/:id)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/tasks/{{taskId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks", "{{taskId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "03 - Cache Invalidation & CRUD Operations",
+			"item": [
+				{
+					"name": "10. POST Create Task (Triggers Cache Eviction)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Postman Demonstration Task\",\n  \"description\": \"Proving write invalidation purges cached collection\",\n  \"priority\": \"high\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks"]
+						}
+					}
+				},
+				{
+					"name": "11. GET Cache Stats After POST (Shows Key Evicted)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/debug/cache-stats",
+							"host": ["{{baseUrl}}"],
+							"path": ["debug", "cache-stats"]
+						}
+					}
+				},
+				{
+					"name": "12. GET All Tasks (Fresh Read — Verifies Zero Stale Reads)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks"]
+						}
+					}
+				},
+				{
+					"name": "13. PUT Update Task (Triggers Invalidation)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Postman Demonstration Task (Completed)\",\n  \"completed\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/tasks/{{taskId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks", "{{taskId}}"]
+						}
+					}
+				},
+				{
+					"name": "14. DELETE Task (Triggers Invalidation)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/tasks/{{taskId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["tasks", "{{taskId}}"]
+						}
+					}
+				}
+			]
+		}
+	]
+}
