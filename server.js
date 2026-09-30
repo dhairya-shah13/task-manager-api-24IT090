@@ -8,6 +8,12 @@ const authRoutes = require("./routes/authRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 const authMiddleware = require("./middleware/authMiddleware");
 
+// Practical 10: register the event listeners EXACTLY ONCE at startup.
+// dotenv.config() already ran (line 1), and this sits before app.listen.
+// If this require were missing, the emitter would emit into the void —
+// the classic "notification never appears" bug.
+require("./listeners");
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/task-manager-api";
