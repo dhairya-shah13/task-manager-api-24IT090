@@ -217,3 +217,192 @@ All response times were measured using Node.js high-resolution timers (`performa
 - [x] Comprehensive documentation and viva questions added to `README.md`
 - [x] Zero changes made to frontend (`Dhairya/`)
 
+---
+
+## 📡 Practical 10 — Asynchronous Processing with Event-Driven Architecture
+
+> **Practical 10: Asynchronous Processing with Event-Driven Architecture (CO4 / PO3, PO5)**  
+> **Repository:** `task-manager-api-24IT090` (Backend-only)  
+> **Status:** ✅ Implemented & verified at module level — Postman evidence pending (see §5)  
+> **Frontend: no changes in Practical 10.**
+
+### Objective
+
+Move the slow "notification" work (email/SMS simulation) **off the critical request path**
+using Node.js's built-in `EventEmitter` — no external queues (RabbitMQ/Bull/Redis), no new
+npm dependencies. When a task is created, the API saves it, invalidates the cache (Practical 9,
+unchanged), responds `201` immediately, and only *then* does a background listener perform the
+slow notification. Provable via console timestamps and Postman response times.
+
+### 1. Architecture
+
+```
+Client (Postman / React)
+        │
+        │ POST /tasks (JWT)
+        ▼
+authMiddleware → validateTask → taskController.createTask
+        │
+        │ 1. Task.create(...)                      (owner-scoped, MongoDB)
+        │ 2. cache.del(tasks_<userId> / all_tasks) (Practical 9 invalidation, unchanged)
+        │ 3. res.status(201).json(task)  ◄── CLIENT UNBLOCKED HERE (tens of ms)
+        │
+        │ 4. taskEvents.emit('task-created', payload)   (never awaited)
+        ▼
+EventEmitter singleton (events.js, in-process, captureRejections: true)
+        │
+        ├── 'task-created' → listeners.js handler (BACKGROUND):
+        │       log STARTED → await setTimeout(NOTIFICATION_DELAY_MS)
+        │       → User.findById (email lookup off the critical path)
+        │       → log DONE ... +N ms after API response
+        │
+        └── 'error' → log [Notification:error] (captureRejections safety net)
+
+DELETE /tasks/:id → res 200 → emit('task-deleted') → [Notification] Task "X" was deleted ...
+```
+
+### 2. Files Added / Changed
+
+| File | Status | Purpose |
+|---|---|---|
+| `events.js` | ➕ added | `EventEmitter` singleton; `captureRejections: true` routes async listener failures to `'error'` |
+| `listeners.js` | ➕ added | All listeners registered **once**: `task-created` (async handler), `task-deleted`, `error` |
+| `server.js` | ✏️ changed | `require('./listeners')` exactly once at startup (after `dotenv.config()`, before `app.listen`) |
+| `controllers/taskController.js` | ✏️ changed | `createTask`/`deleteTask` emit **after** the response; demo-only sync comparison mode |
+| `.env.example` | ✏️ changed | Three demo knobs (below) |
+| `docs/TaskManager_Practical_API.postman_collection.json` | ✏️ changed | New folder **"04 - Practical 10 – Events"** (7 requests) |
+| `docs/PRACTICAL_10_POSTMAN_SCREENSHOT_GUIDE.md` | ➕ added | Defines the `pr10-*.png` evidence filenames |
+| `docs/pr10-*.png` | ⏳ pending | 9 screenshots — capture per the guide |
+
+### 3. Configuration (`.env` — see `.env.example`)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `NOTIFICATION_DELAY_MS` | `2000` | Simulated slow notification job; `0` disables the delay |
+| `NOTIFICATION_MODE` | `async` | `sync` = demo-only control experiment (handler runs *before* the response) |
+| `SIMULATE_LISTENER_ERROR` | `false` | `true` = `task-created` handler throws, demonstrating the `error` listener |
+
+### 4. Ordering Guarantee (how it works)
+
+`emit()` calls listeners **synchronously**, but the listener's slow part is
+`await setTimeout(...)`, which yields the single event-loop thread immediately, so `emit()`
+returns at once. Crucially, `res.status(201).json(task)` executes **before** `emit()` — the
+response is already handed to the socket. This is *interleaving on one thread, not
+parallelism*: a CPU-bound listener (busy loop, large JSON parse, crypto) would still block
+every request — that's what `worker_threads` or an external worker are for.
+
+### 5. Evidence — `POST /tasks` response time (Postman "Time")
+
+> ⚠️ **TODO (fill from my Postman run)** — this implementation environment has no MongoDB /
+> Postman, so the numbers below must come from a real run on the dev machine. Do not invent
+> values. Baseline = same request with these changes `git stash`-ed.
+
+| Mode | Reading 1 | Reading 2 | Reading 3 | Average |
+|---|---|---|---|---|
+| Baseline (before Practical 10 code) | `TODO (my Postman run)` | `TODO` | `TODO` | `TODO` |
+| **async** (default, `NOTIFICATION_DELAY_MS=2000`) | `TODO (my Postman run)` | `TODO` | `TODO` | `TODO` |
+| **sync** (`NOTIFICATION_MODE=sync`, control experiment) | `TODO (my Postman run)` | `TODO` | `TODO` | `TODO` |
+
+Expected: async ≈ baseline (tens of ms, tests assert `< 500 ms`); sync ≈ +`NOTIFICATION_DELAY_MS`.
+
+### 6. Console Log Evidence
+
+**Async ordering** (what to capture — `TODO (fill from my server console)`):
+
+```text
+TODO  [API] POST /tasks -> 201 response sent at 20XX-..Z
+TODO  [Notification] handler STARTED at 20XX-..Z
+      (≈ 2000 ms gap — client already has its 201)
+TODO  [Notification] handler DONE 20XX-..Z | Task "Practical 10 Event Demo Task" | user: <email> | +~2000 ms after API response
+```
+
+**Error listener** — verified during implementation (module-level harness run of the real
+`events.js`/`listeners.js` code; no HTTP/DB in that environment, hence the id fallback):
+
+```text
+[Events] Registered listeners: task-created, task-deleted, error
+[Notification] handler STARTED at 2026-09-30T04:41:31.981Z
+[Notification:error] Simulated notification failure
+(process still alive — server would keep serving; next request works)
+```
+
+**Invalid body → no event** (`TODO (fill from my server console)`):
+
+```text
+TODO  POST /tasks 400  ...   ← NO [Notification] lines for this request
+```
+
+### 7. Screenshots (capture per [`docs/PRACTICAL_10_POSTMAN_SCREENSHOT_GUIDE.md`](docs/PRACTICAL_10_POSTMAN_SCREENSHOT_GUIDE.md))
+
+| Filename | Content |
+|---|---|
+| `docs/pr10-baseline-create-timing.png` | Pre-Practical-10 POST time |
+| `docs/pr10-async-create-timing.png` | POST 201 in tens of ms while the 2 s notification runs |
+| `docs/pr10-console-ordering.png` | `[API] … response sent` before `[Notification] handler DONE` |
+| `docs/pr10-sync-create-timing.png` | Sync mode ≈ +2000 ms (control) |
+| `docs/pr10-error-listener.png` | `SIMULATE_LISTENER_ERROR=true`: still 201, error logged, server alive |
+| `docs/pr10-invalid-400-no-event.png` | 400 envelope, zero notification logs |
+| `docs/pr10-noauth-401-no-event.png` | 401, zero notification logs |
+| `docs/pr10-delete-notification.png` | 200 delete + `[Notification] Task "…" was deleted …` |
+| `docs/pr10-cache-regression.png` | Fresh `GET /tasks` shows the new task + `cache-stats` 200 |
+
+### 8. Viva Q&A
+
+**Q1. Why doesn't emitting block the response, if both run on one Node process?**  
+`emit()` invokes listeners synchronously, but our listener's slow part is `await setTimeout`,
+which hands control back to the event loop immediately, so `emit()` returns at once. Also
+`res.json()` runs *before* `emit()`, so the response is already handed to the socket. This is
+**interleaving on one thread, not parallelism** — a CPU-bound listener (busy loop, big JSON
+parse, crypto) would still block every request; that needs `worker_threads` or an external worker.
+
+**Q2. What if the notification logic were inside the POST route?**  
+The client would wait for it: response time ≈ DB time + notification time (≈ +2000 ms here).
+Evidence: the sync-mode row in §5 (`NOTIFICATION_MODE=sync` awaits the handler before responding).
+
+**Q3. Why is EventEmitter fine here but not for millions of events/day?**  
+It is in-process and in-memory: events are lost on crash/restart; there is no persistence, no
+retries or dead-letter queue, no backpressure; it shares CPU/memory with the API; and it does
+not work across multiple server instances (same limitation as `node-cache` in Practical 9),
+with little observability. Production scale → BullMQ/Redis, RabbitMQ, Kafka, or SQS.
+
+**Q4. Why register an `error` listener?**  
+An `'error'` event with **no** listener throws and can crash the process, so one must always
+exist; it logs `[Notification:error]` and never rethrows. `captureRejections: true` additionally
+routes rejected promises from async listeners to that same listener.
+
+**Q5. Link to Practical 9.**  
+Both features take work off the critical request path: caching removes *reads* from the DB path,
+events remove *side effects* from the response path — the client only ever waits for the
+mandatory core (auth + validation + DB write).
+
+### 9. Mistakes Avoided
+
+| Common mistake | How it was avoided |
+|---|---|
+| Notification logic inside the route (blocking) | Route only `emit`s; logic lives in `listeners.js` |
+| `await`ing the emit / wrapping in `Promise.all` | Fire-and-forget `emit`, wrapped in its own `try/catch` |
+| Busy `while` loop for the delay | `await new Promise(r => setTimeout(r, ms))` — yields the event loop instead of freezing the whole API |
+| Emitting before the response | Emit is strictly **after** `res.status(201).json(...)` |
+| `next(err)` after the response was sent | Emit wrapped locally; `next` never called post-response (avoids `ERR_HTTP_HEADERS_SENT`) |
+| Requiring `listeners.js` from multiple files / routes | Single `require` in `server.js`; emitter-level `listenerCount` guard blocks duplicate registration even under require-cache clearing |
+| Missing `'error'` listener | Always registered third; `captureRejections` routes async failures there |
+| Passing the Mongoose document in the payload | Plain snapshot `{ _id, title, priority, user, createdAt, responseSentAtMs }` |
+| Fabricating timings/screenshots | `TODO` placeholders until real Postman runs (§5–§7) |
+
+### 10. Reflection — errors hit during implementation
+
+| # | What happened | How it was fixed |
+|---|---|---|
+| 1 | The `error` listener never logged during the first harness run: the `task-created` listener wrapper called `handleTaskCreated(payload).catch(() => {})`, which **swallowed the rejection** before `captureRejections` could route it to `'error'` | Listener now **returns** the handler promise; re-run confirmed `[Notification:error] Simulated notification failure` logs and the process survives |
+| 2 | In the new sync-demo branch, `payload.responseSentAtMs` stayed at its initial `0`, which would have printed a bogus multi-year lag in the DONE log | `responseSentAtMs` is now set immediately before awaiting the handler in the sync branch (caught in self-review, before any run) |
+
+### 11. Contract & Regression Notes
+
+- **API contract unchanged** (MASTER_CONTEXT §5): status codes, bodies and error envelopes of
+  every existing route are byte-identical; events are a side effect only.
+- Practical 9 caching untouched: invalidation still runs **before** the response; `cache.js`
+  behavior unchanged; verified boot shows `[Events] Registered listeners: task-created,
+  task-deleted, error` exactly once.
+- Ownership scoping unchanged: all queries still `ownerFilter(req)`-scoped; client-supplied
+  `user` still stripped; 404 deletes emit nothing.
+
