@@ -1,5 +1,7 @@
 const Task = require("../models/Task");
 const cache = require("../cache");
+const taskEvents = require("../events");
+const { handleTaskCreated } = require("../listeners");
 
 // Every query is scoped to req.user.id (from the JWT) so account A
 // cannot read, update, or delete account B's tasks.
@@ -69,7 +71,48 @@ async function createTask(req, res, next) {
         cache.del(getTasksCacheKey(req));
         cache.del("all_tasks");
 
+        // Snapshot the plain values we need — deliberately NOT the Mongoose document,
+        // so the event payload survives even if the doc is mutated/GC'd later.
+        const payload = {
+            _id: task._id,
+            title: task.title,
+            priority: task.priority,
+            user: task.user,
+            createdAt: task.createdAt,
+            responseSentAtMs: 0
+        };
+
+        // =============================
+        // DEMO ONLY — Practical 10 sync-vs-async comparison; remove in production.
+        // sync mode: the slow notification runs BEFORE the response, so the client
+        // waits the full NOTIFICATION_DELAY_MS — the control experiment that shows
+        // what the event-driven version saves. Default (async) ignores this branch.
+        // =============================
+        if (process.env.NOTIFICATION_MODE === "sync") {
+            payload.responseSentAtMs = Date.now();
+
+            await handleTaskCreated(payload);
+
+            res.status(201).json(task);
+            return;
+        }
+        // ============================= END DEMO ONLY =============================
+
+        const responseSentAtMs = Date.now();
+        payload.responseSentAtMs = responseSentAtMs;
+        console.log(`[API] POST /tasks -> 201 response sent at ${new Date().toISOString()}`);
+
         res.status(201).json(task);
+
+        // Emit AFTER the response (never awaited): the client is already unblocked;
+        // the listener does the slow notification work in the background.
+        try {
+            taskEvents.emit("task-created", payload);
+        } catch (emitErr) {
+            // A synchronous throw inside emit() must NOT reach next(err): the response
+            // is already sent, so next(err) would cause ERR_HTTP_HEADERS_SENT.
+            console.error("[Notification] synchronous emit failure:", emitErr.message);
+        }
     } catch (err) {
         next(err);
     }
@@ -126,6 +169,20 @@ async function deleteTask(req, res, next) {
             success: true,
             message: "Task deleted successfully"
         });
+
+        // Emit only on real success (the 404 path above returns early — never emits).
+        // `task` is the deleted document returned by findOneAndDelete, which already
+        // carries the title — no extra query needed. Response body stays byte-identical.
+        try {
+            taskEvents.emit("task-deleted", {
+                _id: task._id,
+                title: task.title,
+                user: task.user
+            });
+        } catch (emitErr) {
+            // Same reasoning as in createTask: response already sent, never next(err)
+            console.error("[Notification] synchronous emit failure:", emitErr.message);
+        }
     } catch (err) {
         next(err);
     }
