@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const fs = require("fs");
 
 const authRoutes = require("./routes/authRoutes");
 const taskRoutes = require("./routes/taskRoutes");
@@ -16,7 +17,15 @@ require("./listeners");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/task-manager-api";
+let MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/task-manager-api";
+
+// Seamless bridge between Docker container and host machine local MongoDB
+const isInsideDocker = Boolean(process.env.DOCKER_CONTAINER || fs.existsSync("/.dockerenv"));
+if (isInsideDocker && (MONGO_URI.includes("127.0.0.1") || MONGO_URI.includes("localhost"))) {
+    MONGO_URI = MONGO_URI.replace("127.0.0.1", "host.docker.internal").replace("localhost", "host.docker.internal");
+} else if (!isInsideDocker && MONGO_URI.includes("host.docker.internal")) {
+    MONGO_URI = MONGO_URI.replace("host.docker.internal", "127.0.0.1");
+}
 
 app.use(express.json());
 
@@ -31,7 +40,7 @@ app.use((req, res, next) => {
 
 mongoose.connect(MONGO_URI)
     .then(() => {
-        console.log("✅ MongoDB Connected");
+        console.log(`✅ MongoDB Connected (${MONGO_URI})`);
     })
     .catch((err) => {
         console.log("MongoDB Connection Error:", err.message);

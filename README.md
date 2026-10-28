@@ -408,3 +408,61 @@ mandatory core (auth + validation + DB write).
 - Ownership scoping unchanged: all queries still `ownerFilter(req)`-scoped; client-supplied
   `user` still stripped; 404 deletes emit nothing.
 
+
+
+---
+
+## 🐳 Practical 11 — Application Containerization with Docker
+
+> **Practical 11: Containerization of Full-Stack Web Application (CO4, CO5 / PO3, PO5)**  
+> **Repositories:** `task-manager-api-24IT090` (Backend API) & `Dhairya` (React Frontend)  
+> **Status:** ✅ Containerized, Configured & Verified Live  
+
+### 1. Overview & Architecture
+
+Both backend and frontend are containerized using Docker, allowing isolation, portability, and unified orchestration.
+
+```
++-------------------------------------------------------------------------------+
+| HOST MACHINE (Windows / macOS / Linux)                                        |
+|                                                                               |
+|  Local MongoDB Server                                                         |
+|  (mongodb://127.0.0.1:27017/task-manager-api)                                 |
+|         ^                                                                     |
+|         | host.docker.internal:27017                                          |
+|  +------|-----------------------+     +------------------------------------+  |
+|  | [Container: Backend API]     |     | [Container: React Frontend]        |  |
+|  | Image: task-manager-api      |     | Image: dhairya-frontend            |  |
+|  | Runtime: node:20-alpine      |     | Runtime: nginx:alpine              |  |
+|  | Port: 5000:5000              |     | Port: 5173:80                      |  |
+|  | Environment: .env            |     | SPA Routing: nginx.conf            |  |
+|  +------------------------------+     +------------------------------------+  |
+|         ^                                     ^                               |
+|         | REST API Calls (JSON)               | HTTP / Static Assets          |
+|         +-------------------------------------+                               |
+|                               |                                               |
+|                    Client Browser (localhost)                                 |
++-------------------------------------------------------------------------------+
+```
+
+### 2. Implementation Details
+
+- **Backend Dockerfile:** Multi-layer build using `node:20-alpine`. Copies `package*.json`, runs `npm install`, copies source, exposes port 5000, runs `npm start`.
+- **Environment Configuration:** Loaded from `.env` with fallback support.
+- **Local MongoDB Connectivity:** Seamless bridge detecting container runtime (`/.dockerenv`) and routing `127.0.0.1` -> `host.docker.internal` so the container connects directly to the host's existing MongoDB instance.
+- **Frontend Dockerfile:** Multi-stage build (`node:20-alpine` build -> `nginx:alpine` runtime) producing an ultra-lightweight (~26 MB) production image with client-side SPA routing support (`try_files $uri $uri/ /index.html;`).
+- **Orchestration:** `docker-compose.yml` allows running with one command: `docker compose up -d`.
+
+### 3. Quick Run Commands
+
+```bash
+# Backend container
+cd task-manager-api-24IT090
+docker build -t task-manager-api .
+docker run -d --name task-manager-container -p 5000:5000 --add-host=host.docker.internal:host-gateway task-manager-api
+
+# Frontend container
+cd ../Dhairya
+docker build -t dhairya-frontend .
+docker run -d --name dhairya-frontend-container -p 5173:80 dhairya-frontend
+```
