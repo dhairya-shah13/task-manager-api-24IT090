@@ -46,7 +46,7 @@ const cache = require("./cache");
 // hanging on Mongoose's default buffer timeout.
 try {
     require("mongoose").set("bufferTimeoutMS", 100);
-} catch (_e) {
+} catch {
     /* mongoose always present in this repo */
 }
 

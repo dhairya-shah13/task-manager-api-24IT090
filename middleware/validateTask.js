@@ -1,9 +1,5 @@
 const ALLOWED_PRIORITIES = ["low", "medium", "high"];
 
-function isNonEmptyString(value) {
-    return typeof value === "string" && value.trim().length > 0;
-}
-
 function reject(res, message) {
     return res.status(400).json({
         success: false,
@@ -72,7 +68,7 @@ function validateUpdateTask(req, res, next) {
         return reject(res, "Completed must be a boolean");
     }
 
-    if (body.priority !== undefined && !ALLOWED_PRIORITIES.includes(body.priority)) {
+    if (priority !== undefined && !ALLOWED_PRIORITIES.includes(body.priority)) {
         return reject(res, "Priority must be one of: low, medium, high");
     }
 

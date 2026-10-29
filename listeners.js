@@ -67,7 +67,7 @@ async function handleTaskCreated(payload) {
         if (user) {
             assignedUser = user.email;
         }
-    } catch (err) {
+    } catch {
         assignedUser = String(payload.user);
     }
 

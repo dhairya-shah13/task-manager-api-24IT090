@@ -63,7 +63,7 @@ app.use("/tasks", authMiddleware, taskRoutes);
 // =========================
 // GLOBAL ERROR HANDLER
 // =========================
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
     console.error(err);
 
     if (err.name === "ValidationError") {

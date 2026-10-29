@@ -39,7 +39,7 @@ function authMiddleware(req, res, next) {
         // Payload from login: { id, iat, exp }
         req.user = decoded;
         next();
-    } catch (err) {
+    } catch {
         return res.status(401).json({
             success: false,
             message: "Invalid or expired token"
