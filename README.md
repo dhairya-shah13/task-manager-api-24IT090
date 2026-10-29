@@ -1,3 +1,5 @@
+[![CI Pipeline](https://github.com/dhairya-shah13/task-manager-api-24IT090/actions/workflows/ci.yml/badge.svg)](https://github.com/dhairya-shah13/task-manager-api-24IT090/actions/workflows/ci.yml)
+
 # Task Manager API — Backend (Practical 4–7)
 
 Node.js + Express + MongoDB (Mongoose) REST API for the Task Manager full-stack
@@ -466,3 +468,83 @@ cd ../Dhairya
 docker build -t dhairya-frontend .
 docker run -d --name dhairya-frontend-container -p 5173:80 dhairya-frontend
 ```
+
+
+---
+
+## 🚀 Practical 12 — CI/CD Pipeline with GitHub Actions
+
+> **Practical 12: CI/CD Pipeline with GitHub Actions (CO5 / PO3, PO5)**  
+> **Course:** Advanced Web Development Frameworks (`ITUE301`)  
+> **Repository:** `task-manager-api-24IT090` (Backend API)  
+> **Status:** ✅ Implemented, Verified & CI-Ready  
+
+### 1. CI Pipeline Architecture & Overview
+
+The automated Continuous Integration (CI) pipeline triggers on every `push` to `main` and every `pull_request` targeting `main`. The pipeline runs on an isolated virtual runner (`ubuntu-latest`) across two sequential jobs:
+
+```
+git push / PR to main
+         │
+         ▼
+[Job 1: Code Quality & Lint]
+ ├── Checkout code (actions/checkout@v4)
+ ├── Setup Node.js 18 (actions/setup-node@v4 with npm cache)
+ ├── npm ci
+ └── npm run lint (oxlint static code analysis)
+         │ (passes)
+         ▼
+[Job 2: Build & Automated Test] (needs: lint)
+ ├── Checkout code (actions/checkout@v4)
+ ├── Setup Node.js 18 (actions/setup-node@v4 with npm cache)
+ ├── Set test environment: JWT_SECRET & NODE_ENV=test
+ ├── npm ci
+ └── npm test (Jest + Supertest)
+         │
+         ├── [Assertion Failure] ──► ❌ Red Cross (Exit Code 1, Workflow Fails)
+         └── [All Tests Pass]    ──► ✅ Green Checkmark (Exit Code 0, Badge Updated)
+```
+
+- **Pipeline Stages:**
+  1. **Checkout:** Clones the repository commit using `actions/checkout@v4`.
+  2. **Setup Node.js:** Installs Node.js 18.x and binds the npm cache for fast subsequent builds.
+  3. **Dependency Installation:** `npm ci` ensures reproducible, clean installs matching `package-lock.json`.
+  4. **Linting Job:** Runs `oxlint` static analysis to enforce code quality before testing starts.
+  5. **Automated Test Job:** Executes Jest and Supertest in memory with mock environment variables (`JWT_SECRET`, `NODE_ENV=test`), guarding MongoDB from hanging.
+
+---
+
+### 2. Evidence Table
+
+| Evidence Item | Description / Stage | Image |
+|---|---|---|
+| **Workflow Registered** | Workflow registered and recognized under GitHub Actions tab | ![Workflow Registered](docs/pr12-01-workflow-registered.png) |
+| **Pipeline Failed Summary** | Run overview showing failed status (Red ❌) caused by deliberate mismatch | ![Failed Summary](docs/pr12-02-pipeline-failed-summary.png) |
+| **Pipeline Failed Log** | Step log showing assertion failure details (`Expected: 555, Received: 200`) | ![Failed Log](docs/pr12-03-pipeline-failed-log.png) |
+| **Pipeline Passed Summary** | Run overview showing passing status (Green ✅) after fixing assertion | ![Passed Summary](docs/pr12-04-pipeline-passed-summary.png) |
+| **Pipeline Passed Log** | Step log showing all 3 test suites passing cleanly with execution times | ![Passed Log](docs/pr12-05-pipeline-passed-log.png) |
+| **README Status Badge** | Project README displaying the active `passing` status badge | ![Badge Passing](docs/pr12-06-readme-badge-passing.png) |
+| **Local Test Execution** | Terminal output of `npm test` verifying test suite locally before push | ![Local npm test](docs/pr12-07-local-npm-test.png) |
+
+---
+
+### 3. Key Questions & Analysis
+
+#### Q1: What is the difference between Continuous Integration and Continuous Deployment, and which one does this practical actually demonstrate?
+> **Answer:**  
+> - **Continuous Integration (CI):** An engineering practice where developers frequently commit code to a shared repository, and each commit triggers an automated build, linting check, and test suite to detect integration bugs immediately.  
+> - **Continuous Deployment (CD):** The next automation phase where code changes that successfully pass CI testing are automatically deployed to production or staging runtime environments without human intervention.  
+> - **Practical Scope:** This practical demonstrates **Continuous Integration (CI) only**. The pipeline automates dependency resolution, static linting, and automated unit/integration tests, terminating with a pass/fail status and badge update without publishing to a live host or cloud provider.
+
+#### Q2: Why does running tests automatically on every push catch problems earlier than testing manually before a release?
+> **Answer:**  
+> 1. **Immediate Fault Localization:** Testing on every push isolates failures to the exact commit diff that introduced them, eliminating hours of root-cause triage across accumulated release changes.
+> 2. **Reproducible Environment:** CI runs in an immutable, clean container (`ubuntu-latest`), eliminating machine-specific dependencies, stale local states, and *"works on my machine"* excuses.
+> 3. **Fast Feedback Loop:** Developers get notified within seconds while the context of the change is top-of-mind, preventing broken code from compounding into larger integration blockers.
+
+#### Q3: What would happen to the pipeline if the test file path were incorrect — would the workflow fail at the same step as a genuine test failure?
+> **Answer:**  
+> - **Step Level:** Both fail at the exact same workflow step (`run: npm test`) and terminate the runner with exit code `1`.  
+> - **Diagnostic Distinction:**
+>   - An **incorrect test file path** fails during file discovery or module resolution (`No tests found` or `Cannot find module ...`), meaning no test logic was ever executed.  
+>   - A **genuine test failure** means Jest successfully discovered and ran the test suite, executed HTTP requests and route handlers, but an explicit assertion failed (e.g. `expect(res.statusCode).toBe(200)` received `555`), printing a colorized assertion diff.
