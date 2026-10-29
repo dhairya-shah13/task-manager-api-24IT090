@@ -38,13 +38,15 @@ app.use((req, res, next) => {
     next();
 });
 
-mongoose.connect(MONGO_URI)
-    .then(() => {
-        console.log(`✅ MongoDB Connected (${MONGO_URI})`);
-    })
-    .catch((err) => {
-        console.log("MongoDB Connection Error:", err.message);
-    });
+if (process.env.NODE_ENV !== "test") {
+    mongoose.connect(MONGO_URI)
+        .then(() => {
+            console.log(`✅ MongoDB Connected (${MONGO_URI})`);
+        })
+        .catch((err) => {
+            console.log("MongoDB Connection Error:", err.message);
+        });
+}
 
 // Public auth routes: POST /register, POST /login, GET /me (protected inside the router)
 app.use(authRoutes);
@@ -90,6 +92,10 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+    });
+}
+
+module.exports = app;
