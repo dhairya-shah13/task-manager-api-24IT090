@@ -18,16 +18,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: "npm"
 
       - name: Install dependencies
         run: npm install
 
-      - name: Install platform linter binding
-        run: npm install --no-save @oxlint/binding-linux-x64-gnu
-
       - name: Run code validation
-        run: npm run lint
+        run: npx --yes oxlint
 
   build-and-test:
     name: Build & Automated Test
@@ -44,7 +40,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: "npm"
 
       - name: Install dependencies
         run: npm install

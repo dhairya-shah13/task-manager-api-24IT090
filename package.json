@@ -8,7 +8,7 @@
     "dev": "node server.js",
     "compare": "node compare.js",
     "test": "jest --detectOpenHandles --forceExit",
-    "lint": "npx oxlint"
+    "lint": "npx --yes oxlint"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -21,10 +21,6 @@
   },
   "devDependencies": {
     "jest": "^30.5.2",
-    "oxlint": "^1.90.0",
     "supertest": "^7.3.1"
-  },
-  "optionalDependencies": {
-    "@oxlint/binding-linux-x64-gnu": "^1.90.0"
   }
 }
