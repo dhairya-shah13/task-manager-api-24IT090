@@ -18,7 +18,7 @@ EXPOSE 5000
 
 # Default environment configuration (overridable via --env-file or -e)
 ENV PORT=5000 \
-    MONGO_URI=mongodb://host.docker.internal:27017/task-manager-api \
+    MONGO_URI=mongodb://mongodb:27017/task-manager-api \
     JWT_SECRET=super_secret_jwt_key_24IT090 \
     NOTIFICATION_DELAY_MS=2000 \
     NOTIFICATION_MODE=async \
@@ -27,4 +27,3 @@ ENV PORT=5000 \
 
 # Run the API server
 CMD ["npm", "start"]
-
